@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Shape Memory Game</title>
+    <link rel="stylesheet" href="boardgame.css" />
+  </head>
+  <body>
+    <h1>🔷 Shape Memory Game</h1>
+
+    <!-- Topic selector -->
+    <label for="topic-select">Choose a topic:</label>
+    <select id="topic-select">
+      <option value="math">Math</option>
+      <option value="science">Science</option>
+      <option value="spanish">Spanish</option>
+    </select>
+
+    <!-- Start button -->
+    <button id="start-btn">Start Game</button>
+
+    <!-- Game board -->
+    <div id="game-board"></div>
+
+    <!-- Random Question Box -->
+    <div id="question-box" style="display: none">
+      <strong>❓ Challenge Question:</strong>
+      <p id="question-text"></p>
+
+      <!-- Typing area -->
+      <input type="text" id="answer-input" placeholder="Type your answer" />
+      <button id="submit-answer">Submit</button>
+      <p id="feedback" style="margin-top: 10px; font-weight: bold"></p>
+    </div>
+
+    <!-- Game Over -->
+    <div id="game-over" style="display: none">
+      <h2>🎉 Game Over!</h2>
+      <button id="restart-btn">Restart</button>
+    </div>
+
+    <!-- Reward Page -->
+    <div id="reward-page" style="display: none">
+      <h2>🏆 You Earned a Reward!</h2>
+      <p>Congrats! Choose a game to play as your reward.</p>
+
+      <!-- Game selection buttons -->
+      <div id="game-choice">
+        <button id="play-flappy">Play Flappy Bird</button>
+        <button id="play-clicker">Play Clicker Game</button>
+      </div>
+
+      <!-- Flappy Bird -->
+      <div id="flappy-container" style="display: none; margin-top: 20px">
+        <canvas
+          id="flappy-canvas"
+          width="300"
+          height="400"
+          style="border: 1px solid #000"
+        ></canvas>
+        <p>Press SPACE to flap!</p>
+        <button id="exit-flappy">Exit</button>
+      </div>
+
+      <!-- Clicker Game -->
+      <div id="clicker-container" style="display: none; margin-top: 20px">
+        <p>Click the button as many times as you can!</p>
+        <button id="click-btn">Click Me!</button>
+        <p id="click-count">Clicks: 0</p>
+        <button id="exit-clicker">Exit</button>
+      </div>
+
+      <!-- Back to Memory Game -->
+      <div style="margin-top: 20px">
+        <button id="play-again-btn">Back to Memory Game</button>
+      </div>
+    </div>
+
+    <script src="boardgame.js"></script>
+  </body>
+</html>

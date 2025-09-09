@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ball & Bucket – Starter</title>
+    <link rel="stylesheet" href="paddlecatch.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Ball & Bucket</h1>
+
+      <div class="hud">
+        <div>Score: <span id="score">0</span></div>
+        <div>Lives: <span id="lives">3</span></div>
+        <div>Status: <span id="status">Press Space to Start</span></div>
+      </div>
+      <div class="controls" style="margin-bottom: 0.5rem">
+        <label
+          >Subject:
+          <select id="subjectSel">
+            <option value="math">Math</option>
+            <option value="science">Science</option>
+            <option value="spanish">Spanish</option>
+          </select>
+        </label>
+        <label
+          >Grade:
+          <select id="gradeSel">
+            <option value="nine">9</option>
+            <option value="ten">10</option>
+            <option value="eleven">11</option>
+            <option value="twelve">12</option>
+          </select>
+        </label>
+      </div>
+
+      <canvas
+        id="game"
+        width="600"
+        height="400"
+        aria-label="Ball and Bucket game"
+      ></canvas>
+
+      <div class="controls">
+        <button id="startBtn" type="button">Start / Restart</button>
+        <button id="pauseBtn" type="button">Pause</button>
+      </div>
+
+      <p class="hint">
+        Use ← → arrow keys to move the bucket. Press Space to start/pause.
+      </p>
+    </main>
+
+    <!-- Question Modal -->
+    <div id="questionModal" class="modal">
+      <div class="modal-content">
+        <h2>Answer the Question to Continue</h2>
+        <p id="questionText"></p>
+        <input
+          type="text"
+          id="answerInput"
+          placeholder="Enter your answer..."
+        />
+        <div class="modal-buttons">
+          <button id="submitAnswer" type="button">Submit Answer</button>
+        </div>
+        <div id="feedback" class="feedback"></div>
+      </div>
+    </div>
+
+    <script src="paddlecatch.js"></script>
+  </body>
+</html>

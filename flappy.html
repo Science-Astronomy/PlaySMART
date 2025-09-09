@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Droopy Pigeon — Play and Study (stable)</title>
+  <style>
+    :root { --modal-width:420px; --modal-pad:18px; --bg:#87ceeb; }
+    html,body{height:100%;margin:0;}
+    body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);font-family:system-ui, sans-serif}
+    .app{width:520px;max-width:96vw;margin:18px;text-align:center}
+    h1{margin:6px 0 12px;font-size:20px;color:#111}
+    #home{background:linear-gradient(#fff,#f3f8ff);border-radius:12px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,0.12)}
+    .subjects{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
+    .subject-btn{padding:10px 12px;border-radius:10px;border:1px solid #ddd;background:#fff;cursor:pointer;min-width:90px;font-weight:600}
+    .subject-btn.selected{background:#222;color:#fff;border-color:transparent}
+    .controls-row{display:flex;gap:10px;justify-content:center;align-items:center;margin-bottom:12px}
+    select,button.play{padding:10px 14px;border-radius:10px;border:none;background:#222;color:#fff;cursor:pointer;font-weight:600}
+    p.small{font-size:13px;color:#333;margin:8px 0 0}
+    #gameScreen{display:none}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .topbar button{padding:8px 12px;border-radius:8px;border:none;background:#222;color:#fff;cursor:pointer}
+    canvas{border:4px solid #222;border-radius:12px;background:linear-gradient(#87ceeb,#bde7ff);display:block;width:100%;height:auto}
+    #backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:998}
+    #quiz{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:999;width:var(--modal-width);padding:var(--modal-pad);border-radius:12px;background:linear-gradient(180deg,#fff,#f3f8ff);box-shadow:0 12px 40px rgba(0,0,0,0.35);text-align:center}
+    #quiz p{margin:6px 0 12px;font-size:18px;color:#111}
+    #quiz .choices{display:flex;gap:12px;justify-content:center}
+    #quiz .choices button{flex:1 1 auto;padding:10px 12px;font-size:16px;border-radius:8px;border:none;background:#222;color:#fff;cursor:pointer}
+    #message{margin-top:12px;min-height:22px;color:#111;font-weight:600}
+    /* error overlay */
+    #errOverlay {
+      display:none;
+      position:fixed;
+      left:12px;
+      right:12px;
+      bottom:12px;
+      padding:12px;
+      background:#ffefef;
+      border:2px solid #d33;
+      border-radius:8px;
+      z-index:2000;
+      color:#900;
+      font-family:monospace;
+      max-height:30vh;
+      overflow:auto;
+    }
+    @media(max-width:480px){:root{--modal-width:92vw}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div id="home" aria-hidden="false">
+      <h1>Droopy Pigeon — Play and Study</h1>
+      <div>
+        <div class="subjects" role="list" aria-label="Subjects">
+          <button class="subject-btn selected" data-subject="Math">Math</button>
+          <button class="subject-btn" data-subject="Science">Science</button>
+          <button class="subject-btn" data-subject="ELA">ELA</button>
+          <button class="subject-btn" data-subject="Spanish">Spanish</button>
+        </div>
+        <div class="controls-row">
+          <label for="gradeSelect" style="font-weight:600;color:#333">Grade</label>
+          <select id="gradeSelect" aria-label="Choose grade">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="5">5</option>
+            <option value="9" selected>9</option>
+          </select>
+          <button class="play" id="playBtn">Play</button>
+        </div>
+        <p class="small">After you die, you'll be asked a question from the selected subject & grade. Answer correctly to restart :3 </p>
+      </div>
+    </div>
+
+    <div id="gameScreen" aria-hidden="true">
+      <div class="topbar">
+        <div style="font-weight:700;">Subject: <span id="selSubject">Math</span> • Grade <span id="selGrade">9</span></div>
+        <div>
+          <button id="homeBtn">Home</button>
+          <button id="questionBtn">Question (pause)</button>
+        </div>
+      </div>
+      <canvas id="game" width="400" height="600" aria-label="Flappy game"></canvas>
+    </div>
+  </div>
+
+  <div id="backdrop" aria-hidden="true"></div>
+
+  <div id="quiz" role="dialog" aria-modal="true" aria-labelledby="questionText">
+    <p id="questionText">Question goes here</p>
+    <div class="choices">
+      <button id="btnTrue">True</button>
+      <button id="btnFalse">False</button>
+    </div>
+    <div id="message" aria-live="polite"></div>
+  </div>
+
+  <div id="errOverlay" role="alert"></div>
+
+  <script>
+    /***********************************************************************
+     * Defensive, stable Flappy + question bank.
+     * - added try/catch in the main loop so runtime errors won't stop animation
+     * - added a visible error overlay that shows the thrown error
+     * - small guards (e.g. skip update if bird is not ready)
+     * - corrected an incorrect math fact (8×6) in the banks
+     ***********************************************************************/
+
+    // --------- BANKS (same shape: banks[subject][grade] = [ {q,a}, ... ]) ----------
+    const banks = {
+      Math: {
+        "2": [
+          { q: "5 + 3 = 8.", a: true },
+          { q: "A triangle has 3 sides.", a: true },
+          { q: "10 - 4 = 6.", a: true },
+          { q: "A rectangle always has four equal sides.", a: false },
+          { q: "A circle has corners.", a: false },
+          { q: "2 + 2 + 2 = 6.", a: true },
+          { q: "An even number cannot be divided by 2 evenly.", a: false },
+          { q: "7 - 5 = 3.", a: false },
+          { q: "Counting by tens: 10, 20, 30, ...", a: true },
+          { q: "The number 1 is greater than 2.", a: false }
+        ],
+        "3": [
+          { q: "7 × 7 = 49.", a: true },
+          { q: "6 × 7 = 42.", a: true },
+          { q: "Multiplication is repeated addition for whole numbers.", a: true },
+          { q: "8 × 8 = 56.", a: false },           
+          { q: "8 × 6 = 38.", a: false },            
+          { q: "An acute angle is greater than 90°.", a: false },
+          { q: "A polygon is a flat (2D) shape.", a: true },
+          { q: "A polygon must always have 5 sides.", a: false },
+          { q: "The product of 2 and 4 is 8.", a: true },
+          { q: "Multiplying by 1 changes the number.", a: false }
+        ],
+        "5": [
+          { q: "Area of a rectangle = length × width.", a: true },
+          { q: "0.25 equals 1/4.", a: true },
+          { q: "A prime number has exactly two distinct positive divisors.", a: true },
+          { q: "The number 1 is a prime number.", a: false },
+          { q: "A parallelogram always has right angles.", a: false },
+          { q: "Volume of a rectangular prism = length × width × height.", a: true },
+          { q: "All prime numbers are even.", a: false },
+          { q: "The mean is the average of numbers.", a: true },
+          { q: "A decimal 0.75 is less than 1.", a: true },
+          { q: "Subtracting a larger number from a smaller one gives a positive result.", a: false }
+        ],
+        "9": [
+          { q: "The sum of the interior angles of any triangle is 180°.", a: true },
+          { q: "The derivative of x² with respect to x is 2x.", a: true },
+          { q: "In a right triangle, a² + b² = c² (Pythagorean theorem).", a: true },
+          { q: "The slope-intercept form of a line is y = mx + b.", a: true },
+          { q: "In algebra, (a + b)² = a² + b².", a: false },
+          { q: "A function can pass the vertical line test.", a: true },
+          { q: "The set of real numbers includes irrational numbers.", a: true },
+          { q: "Logarithms are unrelated to exponents.", a: false },
+          { q: "An inverse function always exists for any function.", a: false },
+          { q: "A polynomial of degree 2 is called a quadratic.", a: true }
+        ]
+      },
+
+      Science: {
+        "2": [
+          { q: "Plants get energy from sunlight.", a: true },
+          { q: "Water can be solid, liquid, or gas.", a: true },
+          { q: "The Earth is the center of the solar system.", a: false },
+          { q: "Cats are mammals.", a: true },
+          { q: "Sound can travel in a vacuum.", a: false },
+          { q: "A day has 24 hours.", a: true },
+          { q: "Gravity pulls objects toward Earth.", a: true },
+          { q: "All insects have only two legs.", a: false },
+          { q: "Fire is cold.", a: false },
+          { q: "Ice is frozen water.", a: true }
+        ],
+        "3": [
+          { q: "Sound needs matter (a medium) to travel.", a: true },
+          { q: "Plants produce oxygen during photosynthesis.", a: true },
+          { q: "The sun is a star.", a: true },
+          { q: "Light always travels slower than sound.", a: false },
+          { q: "A simple machine can help do work more easily.", a: true },
+          { q: "All rocks are living things.", a: false },
+          { q: "Weather and climate are the same thing.", a: false },
+          { q: "The moon produces its own light.", a: false },
+          { q: "Fossils provide clues about past life.", a: true },
+          { q: "Magnetism can attract some metals.", a: true }
+        ],
+        "5": [
+          { q: "Evaporation changes liquid to gas.", a: true },
+          { q: "The human heart has four chambers.", a: true },
+          { q: "Sound cannot travel in empty space (a vacuum).", a: true },
+          { q: "The sun is one of many stars in the universe.", a: true },
+          { q: "Photosynthesis happens in animal cells.", a: false },
+          { q: "Gravity affects motion on Earth.", a: true },
+          { q: "Matter is made of atoms.", a: true },
+          { q: "Heat always flows from cold to hot.", a: false },
+          { q: "Electricity requires a closed circuit to flow.", a: true },
+          { q: "A hypothesis is an idea you can test.", a: true }
+        ],
+        "9": [
+          { q: "Photosynthesis converts CO₂ and water into glucose and oxygen.", a: true },
+          { q: "Mitosis produces two genetically identical daughter cells.", a: true },
+          { q: "An ionic bond forms by transferring electrons between atoms.", a: true },
+          { q: "The law of conservation of mass states mass can be created in chemical reactions.", a: false },
+          { q: "Acceleration is change in velocity over time.", a: true },
+          { q: "The nucleus of an atom contains protons and neutrons.", a: true },
+          { q: "DNA carries genetic information.", a: true },
+          { q: "In energy transfer, energy can be created from nothing.", a: false },
+          { q: "The phases of the moon follow a predictable pattern.", a: true },
+          { q: "Temperature measures how fast molecules move on average.", a: true }
+        ]
+      },
+
+      ELA: {
+        "2": [
+          { q: "A noun names a person, place, or thing.", a: true },
+          { q: "A sentence should start with a capital letter.", a: true },
+          { q: "The word 'run' is a noun only.", a: false },
+          { q: "Punctuation helps readers understand sentences.", a: true },
+          { q: "The plural of 'dog' is 'dogs'.", a: true },
+          { q: "The word 'happy' is an antonym of 'sad'.", a: false },
+          { q: "A picture book has no words.", a: false },
+          { q: "We read from left to right in English.", a: true },
+          { q: "The letter 'e' is a consonant.", a: false },
+          { q: "A question ends with a question mark.", a: true }
+        ],
+        "3": [
+          { q: "A noun names a person, place, or thing.", a: true },
+          { q: "A simile compares using 'like' or 'as'.", a: true },
+          { q: "A synonym means the same or similar meaning.", a: true },
+          { q: "A paragraph must always contain exactly five sentences.", a: false },
+          { q: "A sentence fragment is a complete sentence.", a: false },
+          { q: "The main idea tells what a paragraph is mostly about.", a: true },
+          { q: "Prefixes change the meaning of a base word.", a: true },
+          { q: "The capital of France is Rome.", a: false },
+          { q: "Adjectives describe nouns.", a: true },
+          { q: "Dialogue is when characters speak in a story.", a: true }
+        ],
+        "5": [
+          { q: "A compound sentence joins two independent clauses.", a: true },
+          { q: "A thesis statement expresses the main idea of an essay.", a: true },
+          { q: "A fragment is a complete sentence.", a: false },
+          { q: "Context clues can help determine the meaning of unknown words.", a: true },
+          { q: "First-person narration uses 'I' or 'we'.", a: true },
+          { q: "A metaphor uses 'like' or 'as' to compare.", a: false },
+          { q: "Author's purpose might be to inform, entertain, or persuade.", a: true },
+          { q: "A homophone is a word that sounds the same as another word.", a: true },
+          { q: "A summary includes all the tiny details of a story.", a: false },
+          { q: "An inference uses evidence and reasoning to draw conclusions.", a: true }
+        ],
+        "9": [
+          { q: "A semicolon can join two related independent clauses.", a: true },
+          { q: "A theme is the central idea of a text.", a: true },
+          { q: "Irony always means the same as sarcasm.", a: false },
+          { q: "An argumentative essay aims to persuade with evidence.", a: true },
+          { q: "An unreliable narrator always tells the truth.", a: false },
+          { q: "Tone is the author's attitude toward the subject.", a: true },
+          { q: "A rhetorical question expects a factual answer.", a: false },
+          { q: "A topic sentence usually states the main idea of a paragraph.", a: true },
+          { q: "Connotation is the emotional or cultural meaning of a word.", a: true },
+          { q: "Active voice places the subject before the verb.", a: true }
+        ]
+      },
+
+      Spanish: {
+        "2": [
+          { q: "Hi is Hola in Spanish.", a: true },
+          { q: "Perro is dog in Spanish.", a: true },
+          { q: "uno is 2 in Spanish", a: false },
+          { q: "Red is Roja in Spanish.", a: true },
+          { q: "Azul is Blue.", a: true },
+          { q: "Dos is 1", a: false },
+          { q: "Gracias means Thank You", a: true },
+          { q: "Adios means Good Morning ", a: false },
+          { q: "Spanish is the second popular language in America.", a: true },
+          { q: "Adios means Hello", a: false }
+        ],
+        "3": [
+          { q: "Hola means Hello", a: true },
+          { q: "Adiós means Good Morning", a: false },
+          { q: "Rojo is a color in Spanish", a: true },
+          { q: "Dos means Three", a: false },
+          { q: "Gracias means Thank You", a: true },
+          { q: "Perro means Cat", a: false },
+          { q: "Mañana can mean Tomorrow", a: true },
+          { q: "Buenos días is used in the Morning", a: true },
+          { q: "Uno, dos, tres are numbers", a: true },
+          { q: "Casa means House", a: true }
+        ],
+        "5": [
+          { q: "Azul is a color in Spanish", a: true },
+          { q: "Amigo means Friend", a: true },
+          { q: "Agua means Water", a: true },
+          { q: "Libro means Pencil", a: false },
+          { q: "Silla means Chair", a: true },
+          { q: "Correr means To Eat", a: false },
+          { q: "Familia means Family", a: true },
+          { q: "Pan means Bread", a: true },
+          { q: "Escuela means School", a: true },
+          { q: "Hola, ¿cómo estás? is a Greeting", a: true }
+        ],
+        "9": [
+          { q: "Verde is a color in Spanish", a: true },
+          { q: "Manzana means Apple", a: true },
+          { q: "Playa means Mountain", a: false },
+          { q: "Profesor means Teacher", a: true },
+          { q: "Gato means Dog", a: false },
+          { q: "Grande means Big", a: true },
+          { q: "Pequeño means Small", a: true },
+          { q: "Correr means To Run", a: true },
+          { q: "Comer means To Drink", a: false },
+          { q: "Ventana means Window", a: true }
+        ]
+      }
+    };
+
+    // --------- UI elements ----------
+    const homeEl = document.getElementById('home');
+    const gameScreen = document.getElementById('gameScreen');
+    const selSubjectSpan = document.getElementById('selSubject');
+    const selGradeSpan = document.getElementById('selGrade');
+    const playBtn = document.getElementById('playBtn');
+    const homeBtn = document.getElementById('homeBtn');
+    const subjectButtons = Array.from(document.querySelectorAll('.subject-btn'));
+    const gradeSelect = document.getElementById('gradeSelect');
+
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    const backdrop = document.getElementById('backdrop');
+    const quizDiv = document.getElementById('quiz');
+    const qText = document.getElementById('questionText');
+    const btnTrue = document.getElementById('btnTrue');
+    const btnFalse = document.getElementById('btnFalse');
+    const msgDiv = document.getElementById('message');
+    const questionBtn = document.getElementById('questionBtn');
+    const errOverlay = document.getElementById('errOverlay');
+
+    // --------- game state & constants ----------
+    let bird, pipes, score, highScore, running = false, gameOver = false;
+    const gravity = 0.45;
+    const flapStrength = -7.5;
+    const pipeGap = 150;
+    const pipeWidth = 60;
+    const pipeInterval = 1200;
+    let lastPipeTime = 0;
+
+    // quiz state
+    let quizActive = false;
+    let forcedQuiz = false;
+    let wasRunningBeforeQuiz = false;
+    let currentQuestion = null;
+
+    // selected bank state
+    let currentSubject = 'Math';
+    let currentGrade = '9';
+
+    // --------- safety helpers ----------
+    function showErrorOverlay(err) {
+      const txt = (err && err.stack) ? err.stack : String(err);
+      errOverlay.textContent = txt;
+      errOverlay.style.display = 'block';
+      console.error(err);
+    }
+    window.addEventListener('error', (ev) => {
+      showErrorOverlay(ev.error || ev.message || ev);
+    });
+    window.addEventListener('unhandledrejection', (ev) => {
+      showErrorOverlay(ev.reason || ev);
+    });
+
+    // --------- banks helper ----------
+    function getCurrentBank() {
+      const s = currentSubject;
+      const g = currentGrade;
+      if (banks[s] && banks[s][g] && banks[s][g].length > 0) return banks[s][g];
+      if (banks[s]) {
+        for (const k of Object.keys(banks[s])) {
+          if (banks[s][k] && banks[s][k].length > 0) return banks[s][k];
+        }
+      }
+      for (const subj of Object.keys(banks)) {
+        for (const gr of Object.keys(banks[subj])) {
+          if (banks[subj][gr] && banks[subj][gr].length > 0) return banks[subj][gr];
+        }
+      }
+      return [];
+    }
+
+    // --------- high score ----------
+    function loadHighScore() {
+      try {
+        const key = `flappyHigh_${currentSubject}_${currentGrade}`;
+        const v = localStorage.getItem(key);
+        highScore = v ? parseInt(v, 10) : 0;
+      } catch (e) {
+        highScore = 0;
+      }
+    }
+    function saveHighScore() {
+      try {
+        const key = `flappyHigh_${currentSubject}_${currentGrade}`;
+        if (typeof highScore === 'number') localStorage.setItem(key, String(highScore));
+      } catch(e){ /* ignore */ }
+    }
+
+    // --------- game core ----------
+    function reset() {
+      bird = { x: 80, y: H / 2, r: 16, vy: 0 };
+      pipes = [];
+      score = 0;
+      running = false;
+      gameOver = false;
+      lastPipeTime = performance.now();
+      loadHighScore();
+    }
+
+    function startGame() {
+      if (running) return;
+      running = true;
+      lastPipeTime = performance.now();
+    }
+
+    function endGame() {
+      if (gameOver) return; // guard
+      gameOver = true;
+      running = false;
+      showQuiz(true);
+    }
+
+    function addPipe() {
+      const margin = 50;
+      const topHeight = margin + Math.random() * (H - 2 * margin - pipeGap);
+      const bottomY = topHeight + pipeGap;
+      pipes.push({ x: W + pipeWidth, top: { y: 0, h: topHeight }, bottom: { y: bottomY, h: H - bottomY }, passed: false });
+    }
+
+    function rect(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); }
+    function circle(x, y, r, color) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+    function collide(b, p) {
+      if (!b || !p) return false;
+      const inX = b.x + b.r > p.x && b.x - b.r < p.x + pipeWidth;
+      if (!inX) return false;
+      const hitTop = b.y - b.r < p.top.h;
+      const hitBottom = b.y + b.r > p.bottom.y;
+      return hitTop || hitBottom;
+    }
+
+    function update(dt, now) {
+      // defensive: don't update until bird exists
+      if (!bird) return;
+      bird.vy += gravity;
+      bird.y += bird.vy;
+
+      if (bird.y - bird.r < 0) {
+        bird.y = bird.r;
+        bird.vy = 0;
+      }
+      if (bird.y + bird.r > H) {
+        bird.y = H - bird.r;
+        endGame();
+      }
+
+      if (now - lastPipeTime > pipeInterval) {
+        addPipe();
+        lastPipeTime = now;
+      }
+
+      for (const p of pipes) {
+        p.x -= 2.5;
+        if (!p.passed && p.x + pipeWidth < bird.x - bird.r) {
+          p.passed = true;
+          score++;
+          highScore = Math.max(highScore || 0, score);
+          saveHighScore();
+        }
+        if (collide(bird, p)) {
+          endGame();
+        }
+      }
+      pipes = pipes.filter(p => p.x + pipeWidth > 0);
+    }
+
+    function draw() {
+      rect(0, 0, W, H, '#9be2ff');
+      rect(0, H - 50, W, 50, '#7fc37f');
+
+      for (const p of pipes) {
+        rect(p.x, p.top.y, pipeWidth, p.top.h, '#2da12d');
+        rect(p.x, p.bottom.y, pipeWidth, p.bottom.h, '#2da12d');
+      }
+
+      if (bird) {
+        circle(bird.x, bird.y, bird.r, '#15279e');
+        circle(bird.x + 6, bird.y - 4, 3, '#fcfdff');
+      }
+
+      ctx.fillStyle = '#111';
+      ctx.font = '24px sans-serif';
+      ctx.fillText(`Score: ${score}`, 12, 32);
+      if (typeof highScore === 'number') ctx.fillText(`Best: ${highScore}`, 12, 60);
+
+      if (!running && !gameOver && !quizActive) {
+        ctx.fillStyle = '#111';
+        ctx.font = '20px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Click / Space / Tap to start', W / 2, H / 2);
+        ctx.textAlign = 'start';
+      }
+
+      if (gameOver) {
+        // dark overlay
+        rect(0, 0, W, H, 'rgba(0,0,0,0.35)');
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.font = '28px sans-serif';
+        ctx.fillText('Game Over', W / 2, H / 2 - 10);
+        ctx.font = '18px sans-serif';
+        ctx.fillText('Answer the question to restart', W / 2, H / 2 + 20);
+        ctx.textAlign = 'start';
+      }
+    }
+
+    // main loop: wrapped in try/catch so one error doesn't stop animation
+    let last = performance.now();
+    function loop(now) {
+      try {
+        const dt = Math.min(33, now - last);
+        last = now;
+        if (running && !gameOver && !quizActive) update(dt, now);
+        draw();
+      } catch (err) {
+        // show error overlay but continue calling rAF
+        showErrorOverlay(err);
+      } finally {
+        requestAnimationFrame(loop);
+      }
+    }
+
+    // --------- input & quiz ----------
+    function flap() {
+      if (quizActive) return;
+      if (!running) startGame();
+      if (gameOver) return;
+      bird.vy = flapStrength;
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        flap();
+      }
+      if (quizActive && e.key === 'Enter') {
+        const active = document.activeElement;
+        if (active !== btnTrue && active !== btnFalse) btnTrue.click();
+      }
+    });
+    document.addEventListener('mousedown', flap);
+    // for touch, prefer not preventing default globally; only prevent default on canvas
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      flap();
+    }, { passive: false });
+
+    function pickQuestion() {
+      const bank = getCurrentBank();
+      if (!bank || bank.length === 0) {
+        currentQuestion = { q: 'No questions available. Restarting...', a: true };
+        return;
+      }
+      currentQuestion = bank[Math.floor(Math.random() * bank.length)];
+    }
+
+    function showQuiz(requireAnswer) {
+      // only allow quiz modal while in-game screen
+      if (gameScreen.style.display !== 'block') return;
+      forcedQuiz = !!requireAnswer;
+      quizActive = true;
+      wasRunningBeforeQuiz = running && !gameOver;
+      running = false;
+      pickQuestion();
+      qText.textContent = currentQuestion.q;
+      msgDiv.textContent = '';
+      backdrop.style.display = 'block';
+      quizDiv.style.display = 'block';
+      btnTrue.focus();
+    }
+
+    function hideQuiz() {
+      quizActive = false;
+      forcedQuiz = false;
+      backdrop.style.display = 'none';
+      quizDiv.style.display = 'none';
+      msgDiv.textContent = '';
+    }
+
+    function checkAnswer(answer) {
+      if (!quizActive || !currentQuestion) return;
+      if (answer === currentQuestion.a) {
+        msgDiv.textContent = '✅ Correct! You are 1% smarter';
+        if (forcedQuiz) {
+          setTimeout(() => {
+            hideQuiz();
+            reset();
+            startGame();
+          }, 600);
+        } else {
+          setTimeout(() => {
+            hideQuiz();
+            if (!gameOver && wasRunningBeforeQuiz) startGame();
+          }, 300);
+        }
+      } else {
+        msgDiv.textContent = '❌ Wrong. Study more you failure';
+      }
+    }
+
+    // --------- UI wiring ----------
+    subjectButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        subjectButtons.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        currentSubject = btn.dataset.subject;
+      });
+    });
+
+    gradeSelect.addEventListener('change', () => { currentGrade = gradeSelect.value; });
+
+    playBtn.addEventListener('click', () => {
+      const selected = document.querySelector('.subject-btn.selected') || subjectButtons[0];
+      currentSubject = selected ? selected.dataset.subject : currentSubject;
+      currentGrade = gradeSelect.value;
+      selSubjectSpan.textContent = currentSubject;
+      selGradeSpan.textContent = currentGrade;
+      homeEl.style.display = 'none';
+      gameScreen.style.display = 'block';
+      homeEl.setAttribute('aria-hidden', 'true');
+      gameScreen.setAttribute('aria-hidden', 'false');
+      loadHighScore();
+      reset();
+      startGame();
+    });
+
+    homeBtn.addEventListener('click', () => {
+      running = false;
+      hideQuiz();
+      gameScreen.style.display = 'none';
+      homeEl.style.display = 'block';
+      gameScreen.setAttribute('aria-hidden', 'true');
+      homeEl.setAttribute('aria-hidden', 'false');
+    });
+
+    questionBtn.addEventListener('click', () => { if (quizActive) return; showQuiz(false); });
+
+    btnTrue.addEventListener('click', () => checkAnswer(true));
+    btnFalse.addEventListener('click', () => checkAnswer(false));
+
+    // --------- helpers ----------
+    function getCurrentBank(){ const s=currentSubject, g=currentGrade; if(banks[s] && banks[s][g] && banks[s][g].length>0) return banks[s][g]; if(banks[s]){ for(const k of Object.keys(banks[s])) if(banks[s][k] && banks[s][k].length>0) return banks[s][k]; } for(const subj of Object.keys(banks)){ for(const gr of Object.keys(banks[subj])) if(banks[subj][gr] && banks[subj][gr].length>0) return banks[subj][gr]; } return []; }
+
+    // --------- init ----------
+    loadHighScore();
+    reset();
+    requestAnimationFrame(loop);
+
+  </script>
+</body>
+</html>

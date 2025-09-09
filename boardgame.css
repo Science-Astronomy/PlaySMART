@@ -1,0 +1,121 @@
+/* Base styling */
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  background: #ca9bf7;
+  margin: 0;
+  padding: 0;
+}
+
+h1 {
+  margin-top: 20px;
+}
+
+/* Memory game board */
+#game-board {
+  display: grid;
+  grid-template-columns: repeat(4, 100px);
+  grid-gap: 10px;
+  justify-content: center;
+  margin: 20px auto;
+  max-width: 450px;
+  display: none;
+}
+
+.card {
+  width: 100px;
+  height: 100px;
+  background: #fff;
+  color: #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Question box */
+#question-box {
+  margin-top: 20px;
+  padding: 12px;
+  background: #ffeaa7;
+  border: 2px solid #d35400;
+  border-radius: 8px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#answer-input {
+  padding: 8px;
+  width: 70%;
+  margin-top: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+#submit-answer {
+  padding: 8px 15px;
+  margin-left: 10px;
+  background-color: #6c5ce7;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#submit-answer:hover {
+  background-color: #4834d4;
+}
+
+#feedback {
+  margin-top: 10px;
+}
+
+/* Game over */
+#game-over {
+  margin-top: 20px;
+  padding: 12px;
+  background: #9b59b6;
+  color: #fff;
+  border-radius: 8px;
+}
+
+/* Reward page styling */
+#game-choice button {
+  padding: 10px 15px;
+  margin: 10px;
+  font-size: 16px;
+  background-color: #6c5ce7;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#game-choice button:hover {
+  background-color: #4834d4;
+}
+
+#flappy-container,
+#clicker-container {
+  background: #fff;
+  padding: 15px;
+  border-radius: 10px;
+  max-width: 350px;
+  margin: 0 auto;
+}
+
+#click-btn {
+  padding: 10px 20px;
+  background: #27ae60;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#click-btn:hover {
+  background: #2ecc71;
+}

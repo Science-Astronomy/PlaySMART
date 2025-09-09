@@ -1,0 +1,34 @@
+/* Basic styling */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #71a3c0;
+  color: #0a0a0a;
+  text-align: center;
+  padding: 50px;
+  font-weight: bold;
+}
+
+h1 {
+  color: #010102;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: #182832;
+  color: white;
+  cursor: pointer;
+  width: 200px;
+  height: 300px;
+  display: inline-block;
+  margin: 5px;
+  vertical-align: top;
+  text-align: center;
+  line-height: 1.2;
+}
+
+button:hover {
+  background-color: #005fa3;
+}

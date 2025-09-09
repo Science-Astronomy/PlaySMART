@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Geometry Hangman</title>
+    <link rel="stylesheet" href="hangman.css" />
+  </head>
+
+  <body>
+    <div class="game-container">
+      <h1>🎮 Geometry Hangman</h1>
+      <p>⭐ Score: <span id="score">0</span></p>
+      You have 7 lives, so you can only make seven mistakes when you guess the
+      letter. You will get a geometry question after each game. You get a point
+      for each word you guess and each question you answer correctly. Good Luck!
+      <!-- The word being guessed -->
+      <p id="word"></p>
+
+      <!-- Wrong guesses -->
+      <p>Wrong guesses: <span id="wrong"></span></p>
+
+      <!-- Letter buttons will be added here -->
+      <div id="letters"></div>
+
+      <!-- Geometry Question Section -->
+      <div id="question-box" class="hidden">
+        <h2>🧮 Geometry Question</h2>
+        <p id="question"></p>
+        <div id="choices"></div>
+        <p id="feedback"></p>
+      </div>
+
+      <!-- Restart button -->
+      <button onclick="startGame()">Restart Game</button>
+
+      <!-- Messages like "You Win!" -->
+      <p id="message"></p>
+    </div>
+    <script src="hangman.js"></script>
+  </body>
+</html>
